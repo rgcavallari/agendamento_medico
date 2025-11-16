@@ -1,0 +1,49 @@
+{% extends "index.html" %}
+
+{% block title %}Agendamentos{% endblock %}
+
+{% block conteudo %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Agendamentos cadastrados</h2>
+    <a href="{{ url_for('agendar') }}" class="btn btn-primary btn-sm">
+      + Novo agendamento
+    </a>
+  </div>
+
+  {% if agendamentos %}
+    <div class="table-responsive">
+      <table class="table table-striped table-hover align-middle">
+        <thead class="table-light">
+          <tr>
+            <th scope="col">Data</th>
+            <th scope="col">Hora</th>
+            <th scope="col">Médico</th>
+            <th scope="col">Paciente</th>
+            <th scope="col">Email</th>
+            <th scope="col">Telefone</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in agendamentos %}
+            <tr>
+              <td>{{ a["data"] | default("") }}</td>
+              <td>{{ a["hora"] | default("") }}</td>
+              <td>
+                <span class="badge bg-primary">
+                  Dr(a). {{ a["medico"] }}
+                </span>
+              </td>
+              <td>{{ a["nome"] }}</td>
+              <td>{{ a["email"] or "-" }}</td>
+              <td>{{ a["telefone"] or "-" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-muted">
+      Não há agendamentos cadastrados no momento.
+    </p>
+  {% endif %}
+{% endblock %}
