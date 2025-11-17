@@ -65,7 +65,7 @@ def test_agendamento_valido(client):
     assert b"Consulta agendada com sucesso!" in resp.data
 
     # Verifica se está listando o agendamento na página de agendamentos
-    resp_lista = client.get("/agendamentos")
+    resp_lista = client.get("/lista")
     assert b"Paciente Teste" in resp_lista.data
     assert b"2025-03-03" in resp_lista.data
     assert b"10:00" in resp_lista.data
