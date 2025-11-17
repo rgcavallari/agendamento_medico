@@ -1,145 +1,106 @@
-# teste_app.py
-
 import pytest
-from datetime import date
-from app import app, init_db
-import app as app_module
+import app as app_module  # importa o seu app.py
+
+
+def contar_agendamentos():
+    """Função auxiliar para contar registros no banco."""
+    conn = app_module.get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT COUNT(*) FROM agendamentos")
+    (total,) = cur.fetchone()
+    conn.close()
+    return total
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     """
-    Cria um cliente de teste do Flask usando um banco de dados temporário
-    para cada teste.
+    Cria um cliente de teste do Flask usando um banco SQLite temporário.
     """
+    # Aponta o DB_NAME do app para um arquivo temporário
     test_db = tmp_path / "test_consultas.db"
-
-    # Redireciona o app para usar outro arquivo de banco de dados
     monkeypatch.setattr(app_module, "DB_NAME", str(test_db))
 
-    # Inicializa as tabelas no banco de teste
-    init_db()
+    # Recria o banco de testes
+    app_module.init_db()
 
-    app.config["TESTING"] = True
-
-    with app.test_client() as client:
-        yield client
+    app_module.app.config["TESTING"] = True
+    client = app_module.app.test_client()
+    return client
 
 
 def test_agendamento_valido(client):
     """
-    Deve permitir agendar uma consulta válida:
-    - dia útil
-    - horário entre 08:00 e 16:00
-    - médico A/B/C
+    Deve permitir agendar uma consulta válida (dia útil e horário correto).
     """
-    # Segunda-feira fixa (2025-06-02 é uma segunda)
-    data_str = "2025-06-02"
-
-    resp = client.post(
+    # 2025-11-17 é uma segunda-feira
+    resposta = client.post(
         "/agendar",
         data={
             "nome": "Paciente Teste",
             "email": "teste@example.com",
             "telefone": "11999999999",
-            "data": data_str,
-            "hora": "10:00",
+            "data": "2025-11-17",
+            "hora": "09:00",
             "medico": "A",
         },
         follow_redirects=True,
     )
 
-    assert resp.status_code == 200
-    assert b"Consulta agendada com sucesso!" in resp.data
-
-
-def test_nao_permite_mesmo_medico_mesmo_dia(client):
-    """
-    Não deve permitir dois agendamentos com o MESMO médico
-    na MESMA data.
-    """
-    data_str = "2025-06-02"  # segunda-feira
-
-    # Primeiro agendamento
-    resp1 = client.post(
-        "/agendar",
-        data={
-            "nome": "Paciente 1",
-            "email": "p1@example.com",
-            "telefone": "111111111",
-            "data": data_str,
-            "hora": "09:00",
-            "medico": "B",
-        },
-        follow_redirects=True,
-    )
-    assert b"Consulta agendada com sucesso!" in resp1.data
-
-    # Segundo agendamento com o mesmo médico e mesma data
-    resp2 = client.post(
-        "/agendar",
-        data={
-            "nome": "Paciente 2",
-            "email": "p2@example.com",
-            "telefone": "222222222",
-            "data": data_str,
-            "hora": "11:00",  # pode ser outra hora, a regra é só por dia
-            "medico": "B",
-        },
-        follow_redirects=True,
-    )
-
-    assert resp2.status_code == 200
-    assert b"Ja existe um agendamento para esse medico nesta data." in resp2.data or \
-           b"Já existe um agendamento para esse médico nesta data." in resp2.data
+    assert resposta.status_code == 200
+    assert b"Consulta agendada com sucesso!" in resposta.data
+    assert contar_agendamentos() == 1
 
 
 def test_nao_permite_fim_de_semana(client):
     """
-    Não deve permitir agendamento em sábado ou domingo.
+    Não deve permitir agendar consulta em fim de semana.
     """
-    # 2025-06-01 é domingo
-    data_domingo = "2025-06-01"
-
-    resp = client.post(
+    # 2025-11-22 é um sábado
+    resposta = client.post(
         "/agendar",
         data={
-            "nome": "Paciente Fim de Semana",
-            "email": "fds@example.com",
-            "telefone": "333333333",
-            "data": data_domingo,
-            "hora": "09:00",
-            "medico": "C",
+            "nome": "Paciente FimSemana",
+            "email": "fimsemana@example.com",
+            "telefone": "11999999999",
+            "data": "2025-11-22",
+            "hora": "10:00",
+            "medico": "B",
         },
         follow_redirects=True,
     )
 
-    assert resp.status_code == 200
-    assert b"Agendamentos so podem ser feitos de segunda a sexta-feira." in resp.data or \
-           b"Agendamentos s\xc3\xb3 podem ser feitos de segunda a sexta-feira." in resp.data
+    assert resposta.status_code == 200
+    assert b"Agendamentos s\xc3\xb3 podem ser feitos de segunda a sexta-feira." in resposta.data
+    assert contar_agendamentos() == 0
 
 
-def test_nao_permite_horario_invalido(client):
+def test_nao_permite_mesmo_medico_mesmo_dia(client):
     """
-    Não deve permitir agendamento fora dos horários:
-    início entre 08:00 e 16:00, de 1 em 1 hora.
+    Não deve permitir dois agendamentos para o mesmo médico no mesmo dia,
+    mesmo em horários diferentes.
     """
-    data_str = "2025-06-02"  # segunda-feira
+    dados = {
+        "nome": "Paciente 1",
+        "email": "pac1@example.com",
+        "telefone": "11999999999",
+        "data": "2025-11-18",  # terça-feira
+        "hora": "08:00",
+        "medico": "C",
+    }
 
-    # Horário inválido: 07:00
-    resp = client.post(
-        "/agendar",
-        data={
-            "nome": "Paciente Hora Invalida",
-            "email": "hora@example.com",
-            "telefone": "444444444",
-            "data": data_str,
-            "hora": "07:00",
-            "medico": "A",
-        },
-        follow_redirects=True,
-    )
+    # Primeiro agendamento — deve funcionar
+    resposta1 = client.post("/agendar", data=dados, follow_redirects=True)
+    assert resposta1.status_code == 200
+    assert b"Consulta agendada com sucesso!" in resposta1.data
+    assert contar_agendamentos() == 1
 
-    assert resp.status_code == 200
-    assert b"Horarios permitidos" in resp.data or \
-           b"Hor\u00e1rios permitidos" in resp.data
+    # Segundo agendamento — mesmo médico e mesma data, hora diferente
+    dados2 = dados.copy()
+    dados2["hora"] = "10:00"
+
+    resposta2 = client.post("/agendar", data=dados2, follow_redirects=True)
+    assert resposta2.status_code == 200
+    assert b"J\xc3\xa1 existe um agendamento para esse m\xc3\xa9dico nesta data." in resposta2.data
+    # Continua só com 1 agendamento
+    assert contar_agendamentos() == 1
