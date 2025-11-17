@@ -1,0 +1,41 @@
+name: CI - Docker e Python
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🔄 Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python (para rodar testes fora ou dentro do Docker)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 🐳 Instalar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🧰 Setup do cache para camadas Docker
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: 🔨 Build da imagem Docker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: agendamento:latest
+          cache-from: type=
