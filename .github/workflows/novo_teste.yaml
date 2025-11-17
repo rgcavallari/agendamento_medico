@@ -1,4 +1,4 @@
-name: CI - Docker e Python
+name: CI - Docker Build and Test
 
 on:
   push:
@@ -38,3 +38,18 @@ jobs:
           push: false
           load: true
           tags: agendamento:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+
+      - name: 🔄 Mover cache do Docker
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+
+      - name: 🧪 Rodar testes dentro do container
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}/tests:/app/tests \
+            agendamento:latest \
+            pytest -q
+
