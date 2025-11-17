@@ -38,4 +38,3 @@ jobs:
           push: false
           load: true
           tags: agendamento:latest
-          cache-from: type=
