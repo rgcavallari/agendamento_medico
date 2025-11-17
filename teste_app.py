@@ -5,7 +5,7 @@ from datetime import date
 import app as agendamento_app 
 from app import app, init_db
 
-
+@pytest.fixture
 def setup_module(module):
     """Configuração inicial para os testes."""
     # Garante que o banco e a tabela existem antes de testar
@@ -27,7 +27,7 @@ def test_pagina_agendamentos_carrega():
     resp = client.get("/lista")
     assert resp.status_code == 200
 
-@pytest.fixture
+
 def client(tmp_path):
     """
     Cria um app de teste com um banco SQLite isolado para cada execução.
